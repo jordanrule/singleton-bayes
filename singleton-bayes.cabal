@@ -1,0 +1,67 @@
+cabal-version: 3.8
+name: singleton-bayes
+version: 0.1.0.0
+synopsis: Dependent Bayesian types with singletons and monad-bayes
+category: Probability, Type System, Research
+description: Dependent Bayesian types with singleton witnesses and monad-bayes.
+license: MIT
+license-file: LICENSE
+build-type: Simple
+author: jrule
+maintainer: jrule@example.com
+homepage: https://example.com/singleton-bayes
+bug-reports: https://example.com/singleton-bayes/issues
+tested-with: GHC == 9.2.8, GHC == 9.4.8, GHC == 9.6.5
+
+common common-settings
+  default-language: Haskell2010
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns
+  default-extensions:
+    DataKinds
+    GADTs
+    KindSignatures
+    PolyKinds
+    RankNTypes
+    ScopedTypeVariables
+    TypeFamilies
+    TypeOperators
+    TemplateHaskell
+    FlexibleContexts
+    FlexibleInstances
+    UndecidableInstances
+    TypeApplications
+    StandaloneKindSignatures
+
+library
+  import: common-settings
+  hs-source-dirs: src
+  exposed-modules:
+      DependentBayes.Types
+      DependentBayes.Core
+      DependentBayes.Inference
+      DependentBayes.Example
+  build-depends:
+      base >=4.14 && <5,
+      monad-bayes >=1.3 && <2,
+      singletons >=3.0 && <4,
+      singletons-th >=3.0 && <4
+
+executable singleton-bayes-demo
+  import: common-settings
+  hs-source-dirs: app
+  main-is: Main.hs
+  build-depends:
+      base >=4.14 && <5,
+      singleton-bayes
+
+test-suite singleton-bayes-spec
+  import: common-settings
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Spec.hs
+  build-depends:
+      base >=4.14 && <5,
+      singleton-bayes
+
+
+
