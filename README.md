@@ -1,39 +1,35 @@
 # singleton-bayes
 
-`singleton-bayes` is a small Haskell library for indexed Bayesian models. It combines [`singletons`](https://hackage.haskell.org/package/singletons) and [`monad-bayes`](https://hackage.haskell.org/package/monad-bayes) so model structure can vary by a type-level index while inference remains in ordinary probabilistic monads.
+`singleton-bayes` explores dependent-style Bayesian programming in ordinary Haskell. It combines [`singletons`](https://hackage.haskell.org/package/singletons) and [`monad-bayes`](https://hackage.haskell.org/package/monad-bayes) so inference stays in familiar probabilistic monads while model structure is indexed at the type level.
 
-## Why this is unusual in Haskell
+## Why this library is unique
 
-Most Haskell probabilistic code is either untyped at the model boundary (tags and runtime checks) or strongly typed but monolithic (one latent/evidence shape per model). This library takes a third route:
+In much of the Haskell PPL ecosystem, one typically chooses between:
 
-- a model family is **higher-kinded**: `model :: k -> Type`
-- each index `ix :: k` has its own latent and evidence types
-- singleton witnesses connect runtime choice to the corresponding type-level branch
+- dynamic model selection with runtime tags, or
+- static models with one fixed latent/evidence shape.
 
-In short, it offers a lightweight dependent-style interface without leaving the existing `monad-bayes` ecosystem.
+`singleton-bayes` makes a different trade: model families are higher-kinded (`model :: k -> Type`), and each index carries its own latent and evidence types. Singleton witnesses transport that index from runtime to types, so one program can remain generic while each branch stays precise.
 
-## Core abstraction
+## Current direction: toward a fuller inference framework
 
-```haskell
-class DependentModel (model :: k -> Type) where
-  type LatentState model (ix :: k) :: Type
-  type Evidence model (ix :: k) :: Type
-```
+The project remains intentionally small, but now includes a thin, reusable inference layer:
 
-`DependentBayes.Core` provides `posteriorProgram`, a reusable prior/likelihood skeleton parameterized by the singleton index witness.
+- `posteriorProgram`: condition on one observation
+- `posteriorProgramBatch`: condition on many observations
+- `posteriorAndPredict`: posterior state plus typed prediction output
+- `inferPosteriorBatch` / `inferAndPredict`: ergonomic wrappers in `DependentBayes.Inference`
+
+This keeps the original design intent intact while opening a clear path toward richer inference backends and model tooling.
 
 ## Modules
 
 - `DependentBayes.Types`: index kind (`Mode`) and singleton bridge utilities
-- `DependentBayes.Core`: `DependentModel` and generic posterior program
-- `DependentBayes.Inference`: small inference-facing wrappers
-- `DependentBayes.Example`: concrete toy model instance
+- `DependentBayes.Core`: `DependentModel`, posterior skeletons, prediction hook
+- `DependentBayes.Inference`: small inference-facing entry points
+- `DependentBayes.Example`: toy model showing index-specific latent/evidence/prediction types
 
-## Scope
-
-This project is intentionally minimal: it demonstrates a typed pattern for model families, not a complete inference framework.
-
-## Demo
+## Quick try
 
 ```bash
 cabal run singleton-bayes-demo
