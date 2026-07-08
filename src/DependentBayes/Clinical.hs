@@ -16,7 +16,6 @@
 module DependentBayes.Clinical
   ( -- * Phase index kind
     ClinicalPhase (..)
-  , Sing(SRiskAssessment, SBehaviorGap, SCounselAction)
     -- * Domain types
   , PatientVitals (..)
   , BehaviorSurvey (..)
@@ -34,31 +33,15 @@ module DependentBayes.Clinical
   ) where
 
 import Control.Monad.Bayes.Class (MonadDistribution, MonadFactor, beta, score)
-import Data.Kind (Type)
+import Numeric.Log (Log(..))
 
 import DependentBayes.Core
   ( DependentModel (..)
   , posteriorAndPredict
   , posteriorProgram
   )
-
--- ---------------------------------------------------------------------------
--- Phase index kind
--- Manual singleton definitions (no TemplateHaskell)
--- ---------------------------------------------------------------------------
-
-data ClinicalPhase
-  = RiskAssessment   -- ^ infer P(HF | vitals)
-  | BehaviorGap      -- ^ jointly infer (risk, adherence)
-  | CounselAction    -- ^ project to a typed intervention plan
-  deriving (Eq, Ord, Show)
-
--- Manual singleton GADT for ClinicalPhase
--- (Must be compatible with DependentBayes.Singleton.Sing for use in class methods)
-data Sing (phase :: ClinicalPhase) where
-  SRiskAssessment :: Sing 'RiskAssessment
-  SBehaviorGap    :: Sing 'BehaviorGap
-  SCounselAction  :: Sing 'CounselAction
+import DependentBayes.Singleton.Clinical (Sing(SRiskAssessment, SBehaviorGap, SCounselAction))
+import DependentBayes.Clinical.Types (ClinicalPhase(..))
 
 -- ---------------------------------------------------------------------------
 -- Domain types
@@ -131,14 +114,16 @@ instance DependentModel HeartModel where
   prior SCounselAction  = (,) <$> beta 1.0 4.0 <*> beta 2.0 2.0
 
   -- Score latent states against observed evidence.
+  -- vitalLogLikelihood / behaviorLogLikelihood return log-probabilities (Double);
+  -- Exp wraps them into the Log Double that score expects.
   likelihood SRiskAssessment risk vitals =
-    score $ vitalLogLikelihood risk vitals
+    score $ Exp (vitalLogLikelihood risk vitals)
   likelihood SBehaviorGap (risk, compliance) (vitals, survey) = do
-    score $ vitalLogLikelihood    risk       vitals
-    score $ behaviorLogLikelihood compliance survey
+    score $ Exp (vitalLogLikelihood    risk       vitals)
+    score $ Exp (behaviorLogLikelihood compliance survey)
   likelihood SCounselAction (risk, compliance) (vitals, survey) = do
-    score $ vitalLogLikelihood    risk       vitals
-    score $ behaviorLogLikelihood compliance survey
+    score $ Exp (vitalLogLikelihood    risk       vitals)
+    score $ Exp (behaviorLogLikelihood compliance survey)
 
   -- Return latent unchanged except at 'CounselAction, where the posterior
   -- is projected into a typed list of clinical recommendations.
@@ -207,19 +192,19 @@ heartRiskPosterior
   :: (MonadDistribution m, MonadFactor m)
   => PatientVitals
   -> m RiskScore
-heartRiskPosterior = posteriorProgram @HeartModel SRiskAssessment
+heartRiskPosterior = posteriorProgram @_ @HeartModel SRiskAssessment
 
 -- | Jointly infer risk and behavioural compliance from vitals + survey.
 heartBehaviorGapPosterior
   :: (MonadDistribution m, MonadFactor m)
   => (PatientVitals, BehaviorSurvey)
   -> m (RiskScore, ComplianceScore)
-heartBehaviorGapPosterior = posteriorProgram @HeartModel SBehaviorGap
+heartBehaviorGapPosterior = posteriorProgram @_ @HeartModel SBehaviorGap
 
 -- | Full pipeline: infer (risk, compliance) and project to a counselling plan.
 heartCounsel
   :: (MonadDistribution m, MonadFactor m)
   => (PatientVitals, BehaviorSurvey)
   -> m ((RiskScore, ComplianceScore), [ClinicalAction])
-heartCounsel = posteriorAndPredict @HeartModel SCounselAction
+heartCounsel = posteriorAndPredict @_ @HeartModel SCounselAction
 

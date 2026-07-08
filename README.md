@@ -11,22 +11,11 @@ In much of the Haskell PPL ecosystem, one typically chooses between:
 
 `singleton-bayes` makes a different trade: model families are higher-kinded (`model :: k -> Type`), and each index carries its own latent and evidence types. Singleton witnesses transport that index from runtime to types, so one program can remain generic while each branch stays precise.
 
-## Current direction: toward a fuller inference framework
+## Toward a fuller inference framework: heart-failure counselling
 
-The project remains intentionally small, but now includes a reusable inference layer:
+`DependentBayes.Clinical` is a working inference model that shows what this abstraction is for.
 
-- `DependentModel`: higher-kinded class with index-dependent latent/evidence/prediction types
-- `posteriorProgram`: condition on one observation
-- `posteriorProgramBatch`: condition on many observations  
-- `posteriorAndPredict`: posterior state plus typed prediction output
-
-This keeps the original design intent intact while opening a clear path toward richer inference backends and model tooling.
-
-## Clinical example sketch: heart-failure counselling
-
-The theory behind `singleton-bayes` is illustrated in `DependentBayes.Clinical` (sketch only, not yet integrated).
-
-A **clinical workup** indexed by `ClinicalPhase` could map each phase to structurally distinct types:
+A clinical workup is indexed by the `ClinicalPhase` kind. `HeartModel :: ClinicalPhase -> Type` satisfies the higher-kinded class constraint `DependentModel (model :: k -> Type)` at `k = ClinicalPhase`. Three closed type families then map each phase index to structurally distinct latent, evidence, and prediction types:
 
 | Phase | `LatentState` | `Evidence` | `Prediction` |
 |---|---|---|---|
@@ -34,34 +23,53 @@ A **clinical workup** indexed by `ClinicalPhase` could map each phase to structu
 | `'BehaviorGap` | `(RiskScore, ComplianceScore)` | `(PatientVitals, BehaviorSurvey)` | same |
 | `'CounselAction` | `(RiskScore, ComplianceScore)` | `(PatientVitals, BehaviorSurvey)` | `[ClinicalAction]` |
 
-The central insight: a patient's inferred heart-failure risk may exceed the risk implied by their self-reported behaviour. The **belief–behaviour gap** drives escalation of interventions.
+The central clinical insight is the **belief–behaviour gap**: a patient's heart-failure risk inferred from objective vitals may substantially exceed the risk implied by their self-reported behaviour. At the `'CounselAction` phase the `predict` hook converts the continuous posterior `(risk, compliance)` into a typed recommendation list:
 
 ```haskell
 deriveActions :: RiskScore -> ComplianceScore -> [ClinicalAction]
 deriveActions risk compliance =
   case (risk >= 0.60, risk - compliance >= 0.25) of
-    (True,  True)  -> [ReferToCardiologist, MedicationCounseling, ...]
-    (True,  False) -> [MedicationCounseling, ContinueMonitoring, ...]
-    -- ...
+    (True,  True)  -> [ReferToCardiologist, MedicationCounseling, ReduceSodiumIntake, RecommendExercise]
+    (True,  False) -> [MedicationCounseling, ContinueMonitoring, RecommendExercise]
+    (False, True)  -> [ReduceSodiumIntake, RecommendExercise, ContinueMonitoring]
+    (False, False) -> [ContinueMonitoring]
 ```
 
-The type checker enforces this routing: `[ClinicalAction]` is the `Prediction` type only at `'CounselAction`. Passing a `'RiskAssessment` singleton where the system expects `'CounselAction` is a compile error.
+A patient with systolic BP 145 mmHg, ejection fraction 40 %, low self-reported exercise and medication adherence yields `risk ≈ 0.72, compliance ≈ 0.30` — a gap of 0.42 — and the full intervention stack.
+
+The type checker enforces this routing: `[ClinicalAction]` is the `Prediction` type only at `'CounselAction`. Passing `SCounselAction` where a `'RiskAssessment`-indexed function is expected is a compile error.
+
+The three convenience wrappers hide the singleton machinery from callers entirely:
+
+```haskell
+heartRiskPosterior        :: (MonadDistribution m, MonadFactor m)
+                          => PatientVitals -> m RiskScore
+heartBehaviorGapPosterior :: (MonadDistribution m, MonadFactor m)
+                          => (PatientVitals, BehaviorSurvey) -> m (RiskScore, ComplianceScore)
+heartCounsel              :: (MonadDistribution m, MonadFactor m)
+                          => (PatientVitals, BehaviorSurvey)
+                          -> m ((RiskScore, ComplianceScore), [ClinicalAction])
+```
 
 ## Modules
 
 - `DependentBayes.Types`: index kind (`Mode`) and type families
 - `DependentBayes.Singleton`: polymorphic singleton data family
 - `DependentBayes.Singleton.Mode`: Mode-specific singleton instances
+- `DependentBayes.Singleton.Clinical`: ClinicalPhase-specific singleton instances
 - `DependentBayes.Core`: `DependentModel` class and posterior combinators
 - `DependentBayes.Example`: toy model showing index-specific types
-- `DependentBayes.Clinical`: sketch of clinical counselling model (not yet integrated)
+- `DependentBayes.Clinical.Types`: `ClinicalPhase` kind (separated to break import cycle)
+- `DependentBayes.Clinical`: heart-failure counselling model; Beta priors, Normal likelihoods, `deriveActions`
 
 ## Quick try
 
 ```bash
-cabal build
 cabal run singleton-bayes-demo
 ```
+
+> **macOS note**: if `libffi` is not installed you will get a `ffi.h not found` error.
+> Fix it once with `brew install libffi`; the `cabal.project` already sets `extra-include-dirs` to the Homebrew prefix.
 
 ## License
 

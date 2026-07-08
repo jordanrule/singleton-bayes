@@ -39,10 +39,14 @@ library
       DependentBayes.Types
       DependentBayes.Singleton
       DependentBayes.Singleton.Mode
+      DependentBayes.Singleton.Clinical
       DependentBayes.Core
       DependentBayes.Example
+      DependentBayes.Clinical.Types
+      DependentBayes.Clinical
   build-depends:
       base >=4.14 && <5,
+      log-domain >=0.13 && <1,
       monad-bayes >=1.3 && <2,
       singletons >=3.0 && <4,
       singletons-th >=3.0 && <4
@@ -53,6 +57,7 @@ executable singleton-bayes-demo
   main-is: Main.hs
   build-depends:
       base >=4.14 && <5,
+      monad-bayes >=1.3 && <2,
       singleton-bayes
 
 test-suite singleton-bayes-spec

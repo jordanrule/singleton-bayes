@@ -1,6 +1,53 @@
 module Main where
 
+import Control.Monad.Bayes.Sampler.Strict (sampleIOfixed)
+import Control.Monad.Bayes.Weighted       (runWeightedT)
+
+import DependentBayes.Clinical
+  ( PatientVitals(..), BehaviorSurvey(..)
+  , deriveActions, heartCounsel
+  )
+
+-- | Example patient: elevated BP, reduced EF, poor self-reported behaviour.
+exampleVitals :: PatientVitals
+exampleVitals = PatientVitals
+  { systolicBP       = 145
+  , ejectionFraction = 40
+  , bmi              = 31
+  , patientAge       = 67
+  }
+
+exampleSurvey :: BehaviorSurvey
+exampleSurvey = BehaviorSurvey
+  { weeklyExerciseHours = 0.5
+  , sodiumAdherence     = 0.3
+  , medicationAdherence = 0.4
+  }
+
 main :: IO ()
-main = putStrLn "singleton-bayes: Higher-kinded Bayesian inference with dependent types"
+main = do
+  putStrLn "=== singleton-bayes: heart-failure counselling demo ===\n"
+
+  -- Pure decision logic (no sampling required)
+  let risk       = 0.72 :: Double
+      compliance = 0.30 :: Double
+      gap        = risk - compliance
+      planPure   = deriveActions risk compliance
+
+  putStrLn "Illustrative posterior summary"
+  putStrLn $ "  risk score    : " ++ show risk
+  putStrLn $ "  compliance    : " ++ show compliance
+  putStrLn $ "  gap           : " ++ show gap
+  putStrLn $ "  plan (pure)   : " ++ show planPure
+  putStrLn ""
+
+  -- Full probabilistic pipeline: sample prior, condition on vitals + survey,
+  -- project latent state to a typed [ClinicalAction].
+  -- runWeighted adds importance-weight tracking; sampleIOfixed draws one sample.
+  putStrLn "Running heartCounsel (weighted sampler, one draw)..."
+  ((latent, actions), _w) <-
+    sampleIOfixed $ runWeightedT $ heartCounsel (exampleVitals, exampleSurvey)
+  putStrLn $ "  posterior latent : " ++ show latent
+  putStrLn $ "  counselling plan : " ++ show actions
 
 

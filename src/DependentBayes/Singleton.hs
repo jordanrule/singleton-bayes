@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds   #-}
-{-# LANGUAGE DatatypeContexts  #-}
 {-# LANGUAGE GADTs       #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE PolyKinds   #-}
@@ -12,7 +11,7 @@ module DependentBayes.Singleton
 
 import Data.Kind (Type)
 
--- Polymorphic Sing as a data family that can be instantiated per kind
--- Specific instances are defined in modules that use them (e.g., Singleton.Mode for Mode)
+-- Polymorphic Sing as a data family, instantiated per kind.
+-- See 'DependentBayes.Singleton.Mode' and 'DependentBayes.Singleton.Clinical'.
 data family Sing :: forall k. k -> Type
 
