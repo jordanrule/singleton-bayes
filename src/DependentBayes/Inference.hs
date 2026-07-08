@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes  #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE PolyKinds #-}
@@ -11,7 +12,8 @@ module DependentBayes.Inference
   , posteriorKernel
   ) where
 
-import Control.Monad.Bayes.Class (MonadCond, MonadSample)
+import Control.Monad.Bayes.Class (MonadDistribution, MonadFactor)
+import Data.Kind (Type)
 import Data.Singletons (Sing)
 import DependentBayes.Core
   ( DependentModel
@@ -21,31 +23,35 @@ import DependentBayes.Core
   )
 
 posteriorKernel
-  :: (DependentModel model, MonadSample m, MonadCond m)
+  :: forall k (model :: k -> Type) (ix :: k) m.
+     (DependentModel model, MonadDistribution m, MonadFactor m)
   => Sing (ix :: k)
   -> Evidence model ix
   -> m (LatentState model ix)
-posteriorKernel = posteriorProgram
+posteriorKernel = posteriorProgram @k @model
 
 inferPosterior
-  :: (DependentModel model, MonadSample m, MonadCond m)
+  :: forall k (model :: k -> Type) (ix :: k) m.
+     (DependentModel model, MonadDistribution m, MonadFactor m)
   => Sing (ix :: k)
   -> Evidence model ix
   -> m (LatentState model ix)
-inferPosterior = posteriorKernel
+inferPosterior = posteriorKernel @k @model
 
 inferPosteriorBatch
-  :: (DependentModel model, MonadSample m, MonadCond m, Foldable t)
+  :: forall k (model :: k -> Type) (ix :: k) m t.
+     (DependentModel model, MonadDistribution m, MonadFactor m, Foldable t)
   => Sing (ix :: k)
   -> t (Evidence model ix)
   -> m (LatentState model ix)
-inferPosteriorBatch = posteriorProgramBatch
+inferPosteriorBatch = posteriorProgramBatch @k @model
 
 inferAndPredict
-  :: (DependentModel model, MonadSample m, MonadCond m)
+  :: forall k (model :: k -> Type) (ix :: k) m.
+     (DependentModel model, MonadDistribution m, MonadFactor m)
   => Sing (ix :: k)
   -> Evidence model ix
   -> m (LatentState model ix, Prediction model ix)
-inferAndPredict = posteriorAndPredict
+inferAndPredict = posteriorAndPredict @k @model
 
 

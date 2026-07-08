@@ -13,27 +13,54 @@ In much of the Haskell PPL ecosystem, one typically chooses between:
 
 ## Current direction: toward a fuller inference framework
 
-The project remains intentionally small, but now includes a thin, reusable inference layer:
+The project remains intentionally small, but now includes a reusable inference layer:
 
+- `DependentModel`: higher-kinded class with index-dependent latent/evidence/prediction types
 - `posteriorProgram`: condition on one observation
-- `posteriorProgramBatch`: condition on many observations
+- `posteriorProgramBatch`: condition on many observations  
 - `posteriorAndPredict`: posterior state plus typed prediction output
-- `inferPosteriorBatch` / `inferAndPredict`: ergonomic wrappers in `DependentBayes.Inference`
 
 This keeps the original design intent intact while opening a clear path toward richer inference backends and model tooling.
 
+## Clinical example sketch: heart-failure counselling
+
+The theory behind `singleton-bayes` is illustrated in `DependentBayes.Clinical` (sketch only, not yet integrated).
+
+A **clinical workup** indexed by `ClinicalPhase` could map each phase to structurally distinct types:
+
+| Phase | `LatentState` | `Evidence` | `Prediction` |
+|---|---|---|---|
+| `'RiskAssessment` | `RiskScore` | `PatientVitals` | `RiskScore` |
+| `'BehaviorGap` | `(RiskScore, ComplianceScore)` | `(PatientVitals, BehaviorSurvey)` | same |
+| `'CounselAction` | `(RiskScore, ComplianceScore)` | `(PatientVitals, BehaviorSurvey)` | `[ClinicalAction]` |
+
+The central insight: a patient's inferred heart-failure risk may exceed the risk implied by their self-reported behaviour. The **belief–behaviour gap** drives escalation of interventions.
+
+```haskell
+deriveActions :: RiskScore -> ComplianceScore -> [ClinicalAction]
+deriveActions risk compliance =
+  case (risk >= 0.60, risk - compliance >= 0.25) of
+    (True,  True)  -> [ReferToCardiologist, MedicationCounseling, ...]
+    (True,  False) -> [MedicationCounseling, ContinueMonitoring, ...]
+    -- ...
+```
+
+The type checker enforces this routing: `[ClinicalAction]` is the `Prediction` type only at `'CounselAction`. Passing a `'RiskAssessment` singleton where the system expects `'CounselAction` is a compile error.
+
 ## Modules
 
-- `DependentBayes.Types`: index kind (`Mode`) and singleton bridge utilities
-- `DependentBayes.Core`: `DependentModel`, posterior skeletons, prediction hook
-- `DependentBayes.Inference`: small inference-facing entry points
-- `DependentBayes.Example`: toy model showing index-specific latent/evidence/prediction types
+- `DependentBayes.Types`: index kind (`Mode`) and type families
+- `DependentBayes.Singleton`: polymorphic singleton data family
+- `DependentBayes.Singleton.Mode`: Mode-specific singleton instances
+- `DependentBayes.Core`: `DependentModel` class and posterior combinators
+- `DependentBayes.Example`: toy model showing index-specific types
+- `DependentBayes.Clinical`: sketch of clinical counselling model (not yet integrated)
 
 ## Quick try
 
 ```bash
+cabal build
 cabal run singleton-bayes-demo
-cabal test singleton-bayes-spec
 ```
 
 ## License

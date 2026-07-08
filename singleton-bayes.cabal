@@ -37,8 +37,9 @@ library
   hs-source-dirs: src
   exposed-modules:
       DependentBayes.Types
+      DependentBayes.Singleton
+      DependentBayes.Singleton.Mode
       DependentBayes.Core
-      DependentBayes.Inference
       DependentBayes.Example
   build-depends:
       base >=4.14 && <5,

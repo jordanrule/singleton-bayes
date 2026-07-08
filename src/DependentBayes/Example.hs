@@ -9,10 +9,11 @@ module DependentBayes.Example
   , exampleForecast
   ) where
 
-import Control.Monad.Bayes.Class (MonadCond, MonadSample)
-import Data.Singletons (Sing)
+import Control.Monad.Bayes.Class (MonadDistribution, MonadFactor)
 import DependentBayes.Core (DependentModel(..), posteriorAndPredict, posteriorProgram, posteriorProgramBatch)
 import DependentBayes.Types (Mode(..), Observation, Latent)
+import DependentBayes.Singleton (Sing)
+import DependentBayes.Singleton.Mode (Sing(SStatic, SAdaptive))
 
 data ToyModel (mode :: Mode) = ToyModel
 
@@ -36,23 +37,23 @@ instance DependentModel ToyModel where
   predict SAdaptive (x, y) = pure (x + y)
 
 examplePosterior
-  :: (MonadSample m, MonadCond m)
+  :: (MonadDistribution m, MonadFactor m)
   => Sing (mode :: Mode)
   -> Evidence ToyModel mode
   -> m (LatentState ToyModel mode)
-examplePosterior = posteriorProgram
+examplePosterior = posteriorProgram @_ @ToyModel
 
 examplePosteriorBatch
-  :: (MonadSample m, MonadCond m, Foldable t)
+  :: (MonadDistribution m, MonadFactor m, Foldable t)
   => Sing (mode :: Mode)
   -> t (Evidence ToyModel mode)
   -> m (LatentState ToyModel mode)
-examplePosteriorBatch = posteriorProgramBatch
+examplePosteriorBatch = posteriorProgramBatch @_ @ToyModel
 
 exampleForecast
-  :: (MonadSample m, MonadCond m)
+  :: (MonadDistribution m, MonadFactor m)
   => Sing (mode :: Mode)
   -> Evidence ToyModel mode
   -> m (LatentState ToyModel mode, Prediction ToyModel mode)
-exampleForecast = posteriorAndPredict
+exampleForecast = posteriorAndPredict @_ @ToyModel
 

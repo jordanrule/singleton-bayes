@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes  #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
@@ -14,63 +15,62 @@ module DependentBayes.Core
   , IndexedProgram(..)
   ) where
 
-import Control.Monad.Bayes.Class (MonadCond, MonadSample)
+import Control.Monad.Bayes.Class (MonadDistribution, MonadFactor)
 import Data.Kind (Type)
-import Data.Singletons (Sing)
+import DependentBayes.Singleton (Sing)
 
 class DependentModel (model :: k -> Type) where
   type LatentState model (ix :: k) :: Type
   type Evidence model (ix :: k) :: Type
   type Prediction model (ix :: k) :: Type
-  type Prediction model ix = LatentState model ix
 
-  prior :: MonadSample m => Sing ix -> m (LatentState model ix)
+  prior :: MonadDistribution m => Sing ix -> m (LatentState model ix)
   likelihood
-    :: MonadCond m
+    :: MonadFactor m
     => Sing ix
     -> LatentState model ix
     -> Evidence model ix
     -> m ()
 
   -- Optional projection for downstream tasks (forecasting, decoding, etc.).
+  -- Subclasses should override if Prediction differs from LatentState.
   predict
     :: Monad m
     => Sing ix
     -> LatentState model ix
     -> m (Prediction model ix)
-  predict _ latent = pure latent
 
 posteriorProgram
-  :: forall model k ix m.
-     (DependentModel model, MonadSample m, MonadCond m)
+  :: forall k (model :: k -> Type) (ix :: k) m.
+     (DependentModel model, MonadDistribution m, MonadFactor m)
   => Sing (ix :: k)
   -> Evidence model ix
   -> m (LatentState model ix)
 posteriorProgram ix evidence = do
-  latent <- prior ix
-  likelihood ix latent evidence
+  latent <- prior @k @model ix
+  likelihood @k @model ix latent evidence
   pure latent
 
 posteriorProgramBatch
-  :: forall model k ix m t.
-     (DependentModel model, MonadSample m, MonadCond m, Foldable t)
+  :: forall k (model :: k -> Type) (ix :: k) m t.
+     (DependentModel model, MonadDistribution m, MonadFactor m, Foldable t)
   => Sing (ix :: k)
   -> t (Evidence model ix)
   -> m (LatentState model ix)
 posteriorProgramBatch ix evidences = do
-  latent <- prior ix
-  mapM_ (likelihood ix latent) evidences
+  latent <- prior @k @model ix
+  mapM_ (likelihood @k @model ix latent) evidences
   pure latent
 
 posteriorAndPredict
-  :: forall model k ix m.
-     (DependentModel model, MonadSample m, MonadCond m)
+  :: forall k (model :: k -> Type) (ix :: k) m.
+     (DependentModel model, MonadDistribution m, MonadFactor m)
   => Sing (ix :: k)
   -> Evidence model ix
   -> m (LatentState model ix, Prediction model ix)
 posteriorAndPredict ix evidence = do
-  latent <- posteriorProgram ix evidence
-  prediction <- predict ix latent
+  latent <- posteriorProgram @k @model ix evidence
+  prediction <- predict @k @model ix latent
   pure (latent, prediction)
 
 newtype IndexedProgram (f :: k -> Type) (ix :: k) a =
