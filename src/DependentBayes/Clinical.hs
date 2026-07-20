@@ -20,6 +20,7 @@ module DependentBayes.Clinical
   , PatientVitals (..)
   , BehaviorSurvey (..)
   , ClinicalAction (..)
+  , Recommendation (..)
   , RiskScore
   , ComplianceScore
     -- * Higher-kinded model
@@ -30,6 +31,7 @@ module DependentBayes.Clinical
   , heartCounsel
     -- * Decision rule (exported for testing / demo)
   , deriveActions
+  , deriveRecommendation
   ) where
 
 import Control.Monad.Bayes.Class (MonadDistribution, MonadFactor, beta, score)
@@ -75,6 +77,14 @@ data ClinicalAction
   | MedicationCounseling
   | ReferToCardiologist
   deriving (Show, Eq, Ord)
+
+-- | A recommendation package that preserves the clinician's role while
+-- making the underlying rationale easier for a patient to understand.
+data Recommendation = Recommendation
+  { recommendationActions :: [ClinicalAction]
+  , clinicianRationale     :: String
+  , patientExplanation     :: String
+  } deriving (Show, Eq)
 
 -- ---------------------------------------------------------------------------
 -- Higher-kinded model  (HeartModel :: ClinicalPhase -> Type)
@@ -182,6 +192,37 @@ deriveActions risk compliance =
 highRiskThreshold, behaviorGapThreshold :: Double
 highRiskThreshold    = 0.60
 behaviorGapThreshold = 0.25
+
+-- | Build a clinician-guided recommendation package from a posterior summary.
+deriveRecommendation :: RiskScore -> ComplianceScore -> Recommendation
+deriveRecommendation risk compliance =
+  let actions = deriveActions risk compliance
+      gap     = risk - compliance
+      urgent  = risk >= highRiskThreshold
+      misaligned = gap >= behaviorGapThreshold
+      clinicianReason = case (urgent, misaligned) of
+        (True, True)  ->
+          "Elevated risk plus a meaningful belief-behaviour gap suggests urgent review and a fuller support plan."
+        (True, False) ->
+          "Risk is elevated, but the patient appears more aligned than the objective data suggest, so the clinician would focus on medication and follow-up."
+        (False, True) ->
+          "Risk is lower, but the belief-behaviour gap points to lifestyle coaching and close monitoring."
+        (False, False) ->
+          "Risk and self-reported adherence appear broadly aligned, so watchful monitoring is the most appropriate first step."
+      patientNarrative = case (urgent, misaligned) of
+        (True, True)  ->
+          "Your clinician can use this as a conversation starter: the recommendation is meant to be reviewed with you, not to replace the care relationship."
+        (True, False) ->
+          "This plan is being shared to help you understand the concern and to make the next steps easier to discuss with your clinician."
+        (False, True) ->
+          "The recommendation is designed to make the rationale visible while keeping the discussion grounded in your goals and your clinician's guidance."
+        (False, False) ->
+          "This is a simple monitoring plan, meant to be reviewed together with your clinician as your needs change."
+  in Recommendation
+       { recommendationActions = actions
+       , clinicianRationale     = clinicianReason
+       , patientExplanation     = patientNarrative
+       }
 
 -- ---------------------------------------------------------------------------
 -- Inference entry points

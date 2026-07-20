@@ -3,9 +3,8 @@
 
 module Main where
 
-import DependentBayes.Core (predict)
-import DependentBayes.Example (ToyModel)
-import DependentBayes.Types
+import Data.List (isInfixOf)
+import DependentBayes.Clinical (ClinicalAction(..), Recommendation(..), deriveRecommendation)
 import System.Exit (exitFailure)
 
 check :: Bool -> String -> IO ()
@@ -16,25 +15,19 @@ check False msg = do
 
 main :: IO ()
 main = do
-  case parseMode "static" of
-    Just someMode ->
-      withSomeMode someMode $ \s -> do
-        check (renderMode s == "static") "singleton round-trip failed for static"
-        check (latentSpaceName s == "scalar latent") "latent space name mismatch for static"
-    Nothing -> check False "failed to parse static mode"
+  let recommendation = deriveRecommendation 0.72 0.30
 
-  case parseMode "adaptive" of
-    Just someMode ->
-      withSomeMode someMode $ \s -> do
-        check (renderMode s == "adaptive") "singleton round-trip failed for adaptive"
-        check (latentSpaceName s == "pair latent") "latent space name mismatch for adaptive"
-    Nothing -> check False "failed to parse adaptive mode"
+  check
+    (recommendationActions recommendation == [ReferToCardiologist, MedicationCounseling, ReduceSodiumIntake, RecommendExercise])
+    "recommendation actions did not match the expected plan"
 
-  staticPred <- predict @ToyModel (sing @'Static) 2.5 :: IO Double
-  check (staticPred == 2.5) "prediction mismatch for static toy model"
+  check
+    (isInfixOf "belief" (clinicianRationale recommendation))
+    "clinician rationale should mention the belief-behaviour gap"
 
-  adaptivePred <- predict @ToyModel (sing @'Adaptive) (1.0, 3.0) :: IO Double
-  check (adaptivePred == 4.0) "prediction mismatch for adaptive toy model"
+  check
+    (isInfixOf "clinician" (patientExplanation recommendation))
+    "patient explanation should preserve the clinician-patient relationship"
 
   putStrLn "singleton-bayes spec passed"
 

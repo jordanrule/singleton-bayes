@@ -23,7 +23,7 @@ A clinical workup is indexed by the `ClinicalPhase` kind. `HeartModel :: Clinica
 | `'BehaviorGap` | `(RiskScore, ComplianceScore)` | `(PatientVitals, BehaviorSurvey)` | same |
 | `'CounselAction` | `(RiskScore, ComplianceScore)` | `(PatientVitals, BehaviorSurvey)` | `[ClinicalAction]` |
 
-The central clinical insight is the **belief–behaviour gap**: a patient's heart-failure risk inferred from objective vitals may substantially exceed the risk implied by their self-reported behaviour. At the `'CounselAction` phase the `predict` hook converts the continuous posterior `(risk, compliance)` into a typed recommendation list:
+The central clinical insight is the **belief–behaviour gap**: a patient's heart-failure risk inferred from objective vitals may substantially exceed the risk implied by their self-reported behaviour. At the `'CounselAction` phase the `predict` hook converts the continuous posterior `(risk, compliance)` into a typed recommendation list, and the demo now packages that output with a clinician-facing rationale and a patient-facing explanation:
 
 ```haskell
 deriveActions :: RiskScore -> ComplianceScore -> [ClinicalAction]
@@ -33,9 +33,16 @@ deriveActions risk compliance =
     (True,  False) -> [MedicationCounseling, ContinueMonitoring, RecommendExercise]
     (False, True)  -> [ReduceSodiumIntake, RecommendExercise, ContinueMonitoring]
     (False, False) -> [ContinueMonitoring]
+
+-- A clinician-guided package that also makes the reasoning visible to the patient.
+data Recommendation = Recommendation
+  { recommendationActions :: [ClinicalAction]
+  , clinicianRationale     :: String
+  , patientExplanation     :: String
+  }
 ```
 
-A patient with systolic BP 145 mmHg, ejection fraction 40 %, low self-reported exercise and medication adherence yields `risk ≈ 0.72, compliance ≈ 0.30` — a gap of 0.42 — and the full intervention stack.
+A patient with systolic BP 145 mmHg, ejection fraction 40 %, low self-reported exercise and medication adherence yields `risk ≈ 0.72, compliance ≈ 0.30` — a gap of 0.42 — and the full intervention stack. The demo now surfaces both the action list and the explanation text so the recommendation can be discussed as part of the clinician-patient relationship rather than as a standalone machine output.
 
 The type checker enforces this routing: `[ClinicalAction]` is the `Prediction` type only at `'CounselAction`. Passing `SCounselAction` where a `'RiskAssessment`-indexed function is expected is a compile error.
 
@@ -60,7 +67,7 @@ heartCounsel              :: (MonadDistribution m, MonadFactor m)
 - `DependentBayes.Core`: `DependentModel` class and posterior combinators
 - `DependentBayes.Example`: toy model showing index-specific types
 - `DependentBayes.Clinical.Types`: `ClinicalPhase` kind (separated to break import cycle)
-- `DependentBayes.Clinical`: heart-failure counselling model; Beta priors, Normal likelihoods, `deriveActions`
+- `DependentBayes.Clinical`: heart-failure counselling model; Beta priors, Normal likelihoods, `deriveActions`, and the new `Recommendation` wrapper for shared decision support
 
 ## Quick try
 
