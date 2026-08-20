@@ -75,8 +75,6 @@ heartCounsel              :: (MonadDistribution m, MonadFactor m)
 cabal run singleton-bayes-demo
 ```
 
-> **macOS note**: if `libffi` is not installed you will get a `ffi.h not found` error.
-> Fix it once with `brew install libffi`; the `cabal.project` already sets `extra-include-dirs` to the Homebrew prefix.
 
 ## License
 
